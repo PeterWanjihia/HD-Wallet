@@ -1,0 +1,25 @@
+{
+  "name": "hdwallet",
+  "version": "1.0.0",
+  "description": "## Hierarchical Deterministic Wallet Implementation in C",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/PeterWanjihia/HD-Wallet.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/PeterWanjihia/HD-Wallet/issues"
+  },
+  "homepage": "https://github.com/PeterWanjihia/HD-Wallet#readme",
+  "dependencies": {
+    "bip39": "^3.1.0",
+    "ethereumjs-util": "^7.1.5",
+    "ethereumjs-wallet": "^1.0.2"
+  }
+}
