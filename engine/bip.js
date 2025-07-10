@@ -99,6 +99,38 @@ function bitsToMnemonic(bits, wordlist) {
 }
 
 const mnemonicWords = bitsToMnemonic(bitsWithCheckSum, wordlist);
+console.log(mnemonicWords);
 
 console.log("🔷 🔑 Your BIP39 Mnemonic Phrase:");
 console.log(mnemonicWords.join(' '));
+
+/**
+ * 🔹 Derive BIP39 seed from mnemonic using PBKDF2-HMAC-SHA512
+ * @param {string} mnemonic - Mnemonic phrase string
+ * @param {string} passphrase - Optional passphrase (empty string if none)
+ * @returns {Buffer} 64-byte seed
+ */
+
+function mnemonicToSeed(mnemonic,passphrase=''){
+    const salt = 'mnemonic' + passphrase;
+    const seed = crypto.pbkdf2Sync(
+        mnemonic,   //Password
+        salt,       // Salt    
+        2048,       // Iterations
+        64,         // key length in bytes    
+        'sha512'    //digest algorithm
+    );
+    return seed;
+}
+
+// Combine mnemonic words into single string
+const mnemonic = mnemonicWords.join(' ');
+
+// Derive seed
+const seed = mnemonicToSeed(mnemonic, '');
+
+console.log("🔷 🌱 Your BIP39 Seed (hex):");
+console.log(seed.toString('hex'));
+
+
+
