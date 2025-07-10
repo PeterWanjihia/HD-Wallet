@@ -53,4 +53,52 @@ function getChecksumBits(entropyBuffer){
 
 const checksumBits = getChecksumBits(entropyBuffer);
 
+/**
+ * 🔹 Convert bytes (Buffer) to binary string
+ * @param {Array} bytes - Array of bytes from entropyBuffer
+ * @returns {string} binary representation
+ */
 
+
+function bytesToBinary(bytes){
+    return bytes.map(b => b.toString(2).padStart(8,'0')).join('');
+
+}
+
+// Convert entropyBuffer to binary string
+const entropyBits = bytesToBinary([...entropyBuffer]);
+
+console.log("🔷 Entropy Bits Length:", entropyBits.length);
+console.log("🔷 Entropy Bits:", entropyBits);
+
+// Append checksum bits
+const bitsWithCheckSum = entropyBits + checksumBits;
+
+console.log("🔷 Checksum Bits:", checksumBits);
+console.log("🔷 Combined Bits Length (entropy + checksum):", bitsWithCheckSum.length);
+console.log("🔷 Combined Bits:", bitsWithCheckSum);
+
+/**
+ * 🔹 Split bits into 11-bit groups and map each to a word in the wordlist
+ */
+
+function bitsToMnemonic(bits, wordlist) {
+    // Split into 11-bit chunks
+    const chunks = bits.match(/.{1,11}/g);
+
+    console.log("🔷 Total Chunks (should equal mnemonic word count):", chunks.length);
+    console.log("🔷 Chunks:", chunks);
+
+    // Map each chunk to its word
+    const words = chunks.map(binary => {
+        const index = parseInt(binary, 2);
+        return wordlist[index];
+    });
+
+    return words;
+}
+
+const mnemonicWords = bitsToMnemonic(bitsWithCheckSum, wordlist);
+
+console.log("🔷 🔑 Your BIP39 Mnemonic Phrase:");
+console.log(mnemonicWords.join(' '));
