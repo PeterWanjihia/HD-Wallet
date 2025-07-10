@@ -1,6 +1,6 @@
 # 🚀 HD Wallet Generator
 
-## Hierarchical Deterministic Wallet Implementation in C
+## Hierarchical Deterministic Wallet Implementation in Node
 
 This project is a **from-scratch implementation** of a Hierarchical Deterministic (HD) wallet based on **BIP-39** (mnemonic phrases) and **BIP-32** (key derivation) standards, with Ethereum address generation support.
 
