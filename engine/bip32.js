@@ -1,5 +1,8 @@
 const bip39 = require('./bip39');
 const crypto = require('crypto');
+const { ec: EC } = require('elliptic');
+const ec = new EC('secp256k1');
+
 
 // Generate mnemonic
 const mnemonic = bip39.generateMnemonic(128);
@@ -42,3 +45,21 @@ if (IL_int === 0n) {
 } else {
     console.log("✅ IL is valid. Proceeding to derive master public key...");
 }
+
+// Create key pair from private key
+const key = ec.keyFromPrivate(IL);
+
+// Get public key
+const pubKey = key.getPublic();
+
+// Encode compressed
+const compressedPubKey = pubKey.encodeCompressed('hex');
+
+// Encode uncompressed
+const uncompressedPubKey = pubKey.encode('hex');
+
+console.log("\n🔑 Master Public Key (compressed):");
+console.log(compressedPubKey);
+
+console.log("\n🔑 Master Public Key (uncompressed):");
+console.log(uncompressedPubKey);
