@@ -25,3 +25,20 @@ console.log(IL.toString('hex'));
 
 console.log("\n🔑 IR (Master Chain Code):");
 console.log(IR.toString('hex'));
+
+// Convert IL and n to BigInt
+const IL_int = BigInt('0x' + IL.toString('hex'));
+const n = BigInt('0xFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFEBAAEDCE6AF48A03BBFD25E8CD0364141');
+
+console.log("\n🔍 Validating IL as master private key...");
+console.log("IL as integer:", IL_int.toString());
+console.log("n (secp256k1 order):", n.toString());
+
+// Perform checks
+if (IL_int === 0n) {
+    console.log("❌ IL is zero. Invalid master private key.");
+} else if (IL_int >= n) {
+    console.log("❌ IL is greater than or equal to n. Invalid master private key.");
+} else {
+    console.log("✅ IL is valid. Proceeding to derive master public key...");
+}
