@@ -1,97 +1,149 @@
+// test_bip32.js
+const bip32 = require('./bip32');
 const bip39 = require('./bip39');
-const crypto = require('crypto');
-const { ec: EC } = require('elliptic');
-const { keccak256 } = require('js-sha3');
 
-const ec = new EC('secp256k1');
-const n = BigInt('0xFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFEBAAEDCE6AF48A03BBFD25E8CD0364141');
+// Use your provided mnemonic
+const mnemonic = "whisper price example win core side scale lock script air exclude wealth";
 
-// ====== Step 1: Use your test mnemonic ======
-const mnemonic = 'whisper price example win core side scale lock script air exclude wealth';
-console.log("🔑 Testing with provided Mnemonic Phrase:\n" + mnemonic);
+console.log("🔑 Testing with provided Mnemonic Phrase:");
+console.log(mnemonic);
 
-// ====== Step 2: Derive seed ======
-const seed = bip39.mnemonicToSeed(mnemonic, '');
+// Verify mnemonic is valid
+console.log("\n✅ Mnemonic validation:", bip39.validateMnemonic(mnemonic));
 
-// ====== Step 3: Generate master private key and chain code ======
-const I = crypto.createHmac('sha512','Bitcoin Seed').update(seed).digest();
-const IL = I.slice(0,32);
-const IR = I.slice(32);
+// Derive master keys from your mnemonic
+const master = bip32.generateMasterKeys(mnemonic);
+console.log("\n🌱 Derived Master Private Key:");
+console.log(master.privateKey.toString('hex'));
+console.log("\n🌱 Derived Master Chain Code:");
+console.log(master.chainCode.toString('hex'));
 
-console.log("\n🌱 Master Private Key:");
-console.log(IL.toString('hex'));
-console.log("\n🌱 Master Chain Code:");
-console.log(IR.toString('hex'));
+// Test Bitcoin path (for comparison)
+console.log("\n" + "=".repeat(60));
+console.log("🪙 BITCOIN DERIVATION (BIP44 - Coin Type 0)");
+console.log("=".repeat(60));
 
-// ====== Step 4: Key derivation functions ======
-function deriveChild(parentPrivateKey, parentChainCode, index) {
-    const isHardened = index >= 0x80000000;
-    let data;
+const bitcoinPath = "m/44'/0'/0'/0/0";
+const bitcoinAddress = bip32.derivePath(master.privateKey, master.chainCode, bitcoinPath);
 
-    if (isHardened) {
-        data = Buffer.concat([
-            Buffer.from([0x00]),
-            parentPrivateKey,
-            Buffer.from(index.toString(16).padStart(8, '0'), 'hex')
-        ]);
-    } else {
-        const parentKey = ec.keyFromPrivate(parentPrivateKey);
-        const parentPublicKey = Buffer.from(parentKey.getPublic().encodeCompressed('hex'), 'hex');
-        data = Buffer.concat([
-            parentPublicKey,
-            Buffer.from(index.toString(16).padStart(8, '0'), 'hex')
-        ]);
-    }
+console.log(`\n🎯 Bitcoin result for path ${bitcoinPath}:`);
+console.log("Private Key:", bitcoinAddress.privateKey.toString('hex'));
+console.log("Chain Code:", bitcoinAddress.chainCode.toString('hex'));
 
-    const I = crypto.createHmac('sha512', parentChainCode).update(data).digest();
-    const IL = I.slice(0, 32);
-    const IR = I.slice(32);
+const bitcoinKey = bip32.ec.keyFromPrivate(bitcoinAddress.privateKey);
+const bitcoinCompressedPubKey = bitcoinKey.getPublic().encodeCompressed('hex');
+console.log("Public Key (compressed):", bitcoinCompressedPubKey);
 
-    const IL_int = BigInt('0x' + IL.toString('hex'));
-    const parentPrivateKey_int = BigInt('0x' + parentPrivateKey.toString('hex'));
-    const childPrivateKey_int = (IL_int + parentPrivateKey_int) % n;
+// Test Ethereum path (MetaMask compatible)
+console.log("\n" + "=".repeat(60));
+console.log("🔷 ETHEREUM DERIVATION (BIP44 - Coin Type 60)");
+console.log("=".repeat(60));
 
-    return {
-        privateKey: Buffer.from(childPrivateKey_int.toString(16).padStart(64, '0'), 'hex'),
-        chainCode: IR
-    };
-}
+const ethereumPath = "m/44'/60'/0'/0/0";
+const ethereumAddress = bip32.derivePath(master.privateKey, master.chainCode, ethereumPath);
 
-function derivePath(masterPrivateKey, masterChainCode, path) {
-    const segments = path.split('/');
-    if (segments[0] !== 'm') throw new Error('Path must start with m');
+console.log(`\n🎯 Ethereum result for path ${ethereumPath}:`);
+console.log("Private Key:", ethereumAddress.privateKey.toString('hex'));
+console.log("Chain Code:", ethereumAddress.chainCode.toString('hex'));
 
-    let privKey = masterPrivateKey;
-    let chainCode = masterChainCode;
+const ethereumKey = bip32.ec.keyFromPrivate(ethereumAddress.privateKey);
+const ethereumCompressedPubKey = ethereumKey.getPublic().encodeCompressed('hex');
+const ethereumUncompressedPubKey = ethereumKey.getPublic().encode('hex', false);
+console.log("Public Key (compressed):", ethereumCompressedPubKey);
+console.log("Public Key (uncompressed):", ethereumUncompressedPubKey);
 
-    for (let i = 1; i < segments.length; i++) {
-        const segment = segments[i];
-        let index = segment.endsWith("'")
-            ? parseInt(segment.slice(0, -1)) + 0x80000000
-            : parseInt(segment);
-        const child = deriveChild(privKey, chainCode, index);
-        privKey = child.privateKey;
-        chainCode = child.chainCode;
-    }
+// Generate Ethereum address
+const ethAddress = bip32.privateKeyToAddress(ethereumAddress.privateKey);
+const ethChecksumAddress = bip32.toChecksumAddress(ethAddress);
+console.log("Ethereum Address:", ethAddress);
+console.log("Ethereum Address (checksum):", ethChecksumAddress);
 
-    return { privateKey: privKey, chainCode };
-}
-
-// ====== Step 5: Generate and display multiple Ethereum addresses ======
-console.log("\n🏠 Generating first 5 Ethereum addresses:");
+// Generate first 5 Ethereum addresses (MetaMask style)
+console.log("\n" + "=".repeat(60));
+console.log("🏠 GENERATING FIRST 5 ETHEREUM ADDRESSES");
+console.log("=".repeat(60));
 
 for (let i = 0; i < 5; i++) {
     const path = `m/44'/60'/0'/0/${i}`;
-    const { privateKey } = derivePath(IL, IR, path);
-    const key = ec.keyFromPrivate(privateKey);
-    const pubKey = key.getPublic();
-    const uncompressedPubKeyHex = pubKey.encode('hex').slice(2); // remove '04' prefix
+    const derived = bip32.derivePath(master.privateKey, master.chainCode, path);
+    const key = bip32.ec.keyFromPrivate(derived.privateKey);
+    const pubKey = key.getPublic().encodeCompressed('hex');
+    const address = bip32.privateKeyToAddress(derived.privateKey);
+    const checksumAddress = bip32.toChecksumAddress(address);
 
-    const ethAddress = '0x' + keccak256(Buffer.from(uncompressedPubKeyHex, 'hex')).slice(-40);
-
-    console.log(`\nAddress ${i}:`);
+    console.log(`\n📍 Address ${i}:`);
     console.log(`  Path: ${path}`);
-    console.log(`  Private Key: ${privateKey.toString('hex')}`);
-    console.log(`  Public Key (compressed): ${pubKey.encodeCompressed('hex')}`);
-    console.log(`  Ethereum Address: ${ethAddress}`);
+    console.log(`  Private Key: 0x${derived.privateKey.toString('hex')}`);
+    console.log(`  Public Key: ${pubKey}`);
+    console.log(`  Address: ${checksumAddress}`);
 }
+
+// Test the complete wallet generation function
+console.log("\n" + "=".repeat(60));
+console.log("🎒 COMPLETE WALLET GENERATION TEST");
+console.log("=".repeat(60));
+
+const completeWallet = bip32.generateWallet(mnemonic, '', 60, 0, 3);
+console.log("\n🔑 Master Keys:");
+console.log("Private Key:", completeWallet.master.privateKey);
+console.log("Chain Code:", completeWallet.master.chainCode);
+
+console.log("\n🏠 Generated Addresses:");
+completeWallet.addresses.forEach((addr, index) => {
+    console.log(`\n${index + 1}. ${addr.type.toUpperCase()}`);
+    console.log(`   Path: ${addr.path}`);
+    console.log(`   Address: ${addr.address}`);
+    console.log(`   Private Key: ${addr.privateKey}`);
+});
+
+// Test different coin types
+console.log("\n" + "=".repeat(60));
+console.log("🌍 TESTING DIFFERENT COIN TYPES");
+console.log("=".repeat(60));
+
+const coinTypes = [
+    { name: 'Bitcoin', type: 0 },
+    { name: 'Ethereum', type: 60 },
+    { name: 'Litecoin', type: 2 },
+    { name: 'Dogecoin', type: 3 }
+];
+
+coinTypes.forEach(coin => {
+    const path = `m/44'/${coin.type}'/0'/0/0`;
+    const derived = bip32.derivePath(master.privateKey, master.chainCode, path);
+    
+    console.log(`\n${coin.name} (${coin.type}):`);
+    console.log(`  Path: ${path}`);
+    console.log(`  Private Key: ${derived.privateKey.toString('hex')}`);
+    
+    if (coin.type === 60) { // Ethereum
+        const address = bip32.privateKeyToAddress(derived.privateKey);
+        console.log(`  Address: ${bip32.toChecksumAddress(address)}`);
+    }
+});
+
+// Test hardened vs non-hardened derivation
+console.log("\n" + "=".repeat(60));
+console.log("🔒 HARDENED VS NON-HARDENED DERIVATION");
+console.log("=".repeat(60));
+
+const hardenedPath = "m/44'/60'/0'/0/0";
+const nonHardenedPath = "m/44/60/0/0/0";
+
+try {
+    const hardened = bip32.derivePath(master.privateKey, master.chainCode, hardenedPath);
+    console.log(`\n✅ Hardened path (${hardenedPath}):`);
+    console.log(`   Private Key: ${hardened.privateKey.toString('hex')}`);
+    
+    const nonHardened = bip32.derivePath(master.privateKey, master.chainCode, nonHardenedPath);
+    console.log(`\n✅ Non-hardened path (${nonHardenedPath}):`);
+    console.log(`   Private Key: ${nonHardened.privateKey.toString('hex')}`);
+    
+    console.log(`\n🔍 Keys are different: ${hardened.privateKey.toString('hex') !== nonHardened.privateKey.toString('hex')}`);
+} catch (error) {
+    console.error("Error testing derivation:", error.message);
+}
+
+console.log("\n" + "=".repeat(60));
+console.log("✨ TESTING COMPLETE!");
+console.log("=".repeat(60));
