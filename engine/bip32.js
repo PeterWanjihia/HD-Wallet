@@ -28,27 +28,16 @@ function generateMasterKeys(mnemonic, passphrase = '') {
     };
 }
 
-function privateKeyToPublicKey(privateKey){
+/**
+ * Converts a private key to its compressed public key.
+ */
+function privateKeyToPublicKey(privateKey) {
     const keyPair = ec.keyFromPrivate(privateKey);
-    const compressedPublicKey = Buffer.from(keyPair.getPublic(true,'array'));
-    return compressedPublicKey;
+    return Buffer.from(keyPair.getPublic(true, 'array'));
 }
-
-// ==========================
-// 🔧 TEST USAGE SECTION
-// ==========================
-const mnemonic = "whisper price example win core side scale lock script air exclude wealth"; // Replace with your own test mnemonic
-const { privateKey, chainCode } = generateMasterKeys(mnemonic);
-const pubKey = privateKeyToPublicKey(privateKey);
-
-console.log("🔑 Master Private Key:", privateKey.toString('hex'));
-console.log("🔗 Master Chain Code :", chainCode.toString('hex'));
-console.log("🌐 Master Public Key :", pubKey.toString('hex'));
 
 /**
  * Serializes a 32-bit number into a 4-byte big-endian buffer.
- * @param {number} i - 32-bit integer
- * @returns {Buffer}
  */
 function ser32(i) {
     const buf = Buffer.allocUnsafe(4);
@@ -57,35 +46,32 @@ function ser32(i) {
 }
 
 /**
- * Derives a child private key from parent node.
- * @param {Buffer} parentPrivateKey - 32 bytes
- * @param {Buffer} parentChainCode - 32 bytes
- * @param {number} index - child index
- * @param {boolean} hardened - whether derivation is hardened
- * @returns {Object} - { privateKey: Buffer, chainCode: Buffer }
+ * Validates that a private key is within curve order.
  */
 function isValidPrivateKey(privateKey) {
     const keyInt = BigInt('0x' + privateKey.toString('hex'));
     return keyInt !== 0n && keyInt < n;
 }
+
+/**
+ * Validates that a public key is on curve.
+ */
 function isValidPublicKey(publicKey) {
     try {
         const key = ec.keyFromPublic(publicKey);
-        const pub = key.getPublic();
-
-        // Optional explicit point validation
-        if (!pub.validate()) {
-            return false;
-        }
-        return true;
+        return key.getPublic().validate();
     } catch (e) {
         return false;
     }
 }
 
+/**
+ * Derives a child private key from a parent private key.
+ */
 function deriveChildPrivateKey(parentPrivateKey, parentChainCode, index, hardened) {
     while (true) {
         let data;
+
         if (hardened) {
             data = Buffer.concat([
                 Buffer.from([0x00]),
@@ -107,7 +93,7 @@ function deriveChildPrivateKey(parentPrivateKey, parentChainCode, index, hardene
         const parseIL = BigInt('0x' + IL.toString('hex'));
 
         if (parseIL >= n) {
-            index += 1; // Increment index and retry
+            index += 1;
             continue;
         }
 
@@ -115,14 +101,13 @@ function deriveChildPrivateKey(parentPrivateKey, parentChainCode, index, hardene
         const k_child = (parseIL + k_par) % n;
 
         if (k_child === 0n) {
-            index += 1; // Increment index and retry
+            index += 1;
             continue;
         }
 
         const childPrivateKeyHex = k_child.toString(16).padStart(64, '0');
         const childPrivateKey = Buffer.from(childPrivateKeyHex, 'hex');
 
-        // Final validation for sanity
         if (!isValidPrivateKey(childPrivateKey)) {
             index += 1;
             continue;
@@ -135,16 +120,47 @@ function deriveChildPrivateKey(parentPrivateKey, parentChainCode, index, hardene
     }
 }
 
-const child = deriveChildPrivateKey(privateKey, chainCode, 0, true);
-// console.log("🔑 Child Private Key (hardened m/0'):", child.privateKey.toString('hex'));
-// console.log("🔗 Child Chain Code:", child.chainCode.toString('hex'));
+/**
+ * Calculates the fingerprint from a private key.
+ */
+function calculateFingerprint(privateKey) {
+    const publicKey = privateKeyToPublicKey(privateKey);
+    const sha256 = crypto.createHash('sha256').update(publicKey).digest();
+    const ripemd160 = crypto.createHash('ripemd160').update(sha256).digest();
+    return ripemd160.slice(0, 4);
+}
 
-const child1 = deriveChildPrivateKey(privateKey, chainCode, 0, true);
-const child2 = deriveChildPrivateKey(privateKey, chainCode, 1, true);
+// ==========================
+// 🔧 TEST USAGE SECTION
+// ==========================
+const mnemonic = "whisper price example win core side scale lock script air exclude wealth"; // Replace with your test mnemonic
+const { privateKey, chainCode } = generateMasterKeys(mnemonic);
+const pubKey = privateKeyToPublicKey(privateKey);
 
-console.log("🔑 Child 0:", child1.privateKey.toString('hex'));
-console.log("🔑 Child 1:", child2.privateKey.toString('hex'));
+console.log("🔑 Master Private Key:", privateKey.toString('hex'));
+console.log("🔗 Master Chain Code :", chainCode.toString('hex'));
+console.log("🌐 Master Public Key :", pubKey.toString('hex'));
 
+const child0 = deriveChildPrivateKey(privateKey, chainCode, 0, true);
+const child1 = deriveChildPrivateKey(privateKey, chainCode, 1, false);
 
+console.log("🔑 Child 0 Private Key (hardened m/0'):", child0.privateKey.toString('hex'));
+console.log("🔗 Child 0 Chain Code:", child0.chainCode.toString('hex'));
 
+console.log("🔑 Child 1 Private Key (non-hardened m/1):", child1.privateKey.toString('hex'));
+console.log("🔗 Child 1 Chain Code:", child1.chainCode.toString('hex'));
 
+const fingerprint = calculateFingerprint(privateKey);
+console.log("🆔 Master Fingerprint:", fingerprint.toString('hex'));
+
+// ==========================
+
+module.exports = {
+    generateMasterKeys,
+    privateKeyToPublicKey,
+    ser32,
+    isValidPrivateKey,
+    isValidPublicKey,
+    deriveChildPrivateKey,
+    calculateFingerprint
+};
