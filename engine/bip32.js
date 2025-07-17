@@ -28,3 +28,20 @@ function generateMasterKeys(mnemonic, passphrase = '') {
     };
 }
 
+function privateKeyToPublicKey(privateKey){
+    const keyPair = ec.keyFromPrivate(privateKey);
+    const compressedPublicKey = Buffer.from(keyPair.getPublic(true,'array'));
+    return compressedPublicKey;
+}
+
+// ==========================
+// 🔧 TEST USAGE SECTION
+// ==========================
+const mnemonic = "whisper price example win core side scale lock script air exclude wealth"; // Replace with your own test mnemonic
+const { privateKey, chainCode } = generateMasterKeys(mnemonic);
+const pubKey = privateKeyToPublicKey(privateKey);
+
+console.log("🔑 Master Private Key:", privateKey.toString('hex'));
+console.log("🔗 Master Chain Code :", chainCode.toString('hex'));
+console.log("🌐 Master Public Key :", pubKey.toString('hex'));
+
