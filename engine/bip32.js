@@ -4,6 +4,7 @@ const bip39 = require('./bip39');
 const crypto = require('crypto');
 const { ec: EC } = require('elliptic');
 const ec = new EC('secp256k1');
+const bs58 = require('bs58');
 
 // Secp256k1 curve order
 const n = BigInt('0xFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFEBAAEDCE6AF48A03BBFD25E8CD0364141');
@@ -130,6 +131,52 @@ function calculateFingerprint(privateKey) {
     return ripemd160.slice(0, 4);
 }
 
+/**
+ * Serializes an extended key (xprv or xpub) into Base58Check format.
+ * 
+ * @param {Object} params
+ * @param {string} params.versionHex - version hex string (xprv: '0488ade4', xpub: '0488b21e')
+ * @param {number} params.depth - depth level (0 for master)
+ * @param {Buffer} params.parentFingerprint - 4 bytes
+ * @param {number} params.childIndex - child index
+ * @param {Buffer} params.chainCode - 32 bytes chain code
+ * @param {Buffer} params.keyData - 33 bytes key data
+ * @returns {string} Base58Check encoded extended key
+ */
+function serializeExtendedKey({ versionHex, depth, parentFingerprint, childIndex, chainCode, keyData }) {
+    // Assemble components
+    const version = Buffer.from(versionHex, 'hex');
+    const depthBuf = Buffer.from([depth]);
+    const indexBuf = Buffer.allocUnsafe(4);
+    indexBuf.writeUInt32BE(childIndex, 0);
+
+    const data = Buffer.concat([
+        version,
+        depthBuf,
+        parentFingerprint,
+        indexBuf,
+        chainCode,
+        keyData
+    ]);
+
+    // Compute checksum: SHA256(SHA256(data)).slice(0,4)
+    const hash1 = crypto.createHash('sha256').update(data).digest();
+    const hash2 = crypto.createHash('sha256').update(hash1).digest();
+    const checksum = hash2.slice(0, 4);
+
+    // Append checksum
+    const extendedKey = Buffer.concat([data, checksum]);
+
+    // Return Base58 encoded extended key
+    // return bs58.encode(extendedKey);
+    return bs58.default.encode(Buffer.from(extendedKey));
+
+}
+
+
+
+
+
 // ==========================
 // 🔧 TEST USAGE SECTION
 // ==========================
@@ -152,6 +199,33 @@ console.log("🔗 Child 1 Chain Code:", child1.chainCode.toString('hex'));
 
 const fingerprint = calculateFingerprint(privateKey);
 console.log("🆔 Master Fingerprint:", fingerprint.toString('hex'));
+
+const xprv = serializeExtendedKey({
+    versionHex: '0488ade4',
+    depth: 0,
+    parentFingerprint: Buffer.from([0,0,0,0]),
+    childIndex: 0,
+    chainCode: chainCode,
+    keyData: Buffer.concat([
+        Buffer.from([0x00]), // leading 0x00 for private key
+        privateKey
+    ])
+});
+console.log("\n\n🔑 Master xprv:", xprv);
+
+
+// const pubKey = privateKeyToPublicKey(privateKey);
+
+const xpub = serializeExtendedKey({
+    versionHex: '0488b21e',
+    depth: 0,
+    parentFingerprint: Buffer.from([0,0,0,0]),
+    childIndex: 0,
+    chainCode: chainCode,
+    keyData: pubKey // compressed public key
+});
+console.log("🌐 Master xpub:", xpub);
+
 
 // ==========================
 
